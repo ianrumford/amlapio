@@ -1,0 +1,1 @@
+sidebarNodes={"exceptions":[],"extras":[{"id":"api-reference","title":"API Reference","headers":[]},{"id":"readme","title":"README","headers":[{"id":" Installation","anchor":"installation"},{"id":" Agent Usage","anchor":"agent-usage"},{"id":" GenServer Usage","anchor":"genserver-usage"}]}],"modules":[],"protocols":[]}

@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="x-ua-compatible" content="ie=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="generator" content="ExDoc v0.13.0">
+    <title>README – amlapio v0.1.0</title>
+    <link rel="stylesheet" href="dist/app-9c1e3d5aa2.css" />
+    
+      <link rel="canonical" href="https://hexdocs.pm/amlapio/readme.html" />
+    
+    <script src="dist/sidebar_items.js"></script>
+  </head>
+  <body data-type="extras">
+    <script>if(localStorage.getItem('night-mode')) document.body.className += ' night-mode';</script>
+
+<div class="main">
+<button class="sidebar-toggle">
+  <i class="icon-menu"></i>
+</button>
+<section class="sidebar">
+
+  
+  <a href="api-reference.html" class="sidebar-projectLink">
+    <div class="sidebar-projectDetails">
+      <h1 class="sidebar-projectName">
+        amlapio
+      </h1>
+      <h2 class="sidebar-projectVersion">
+        v0.1.0
+      </h2>
+    </div>
+    
+  </a>
+
+  <div class="sidebar-search">
+    <i class="icon-search"></i>
+    <input type="text" class="sidebar-searchInput" placeholder="search" autocomplete="off" />
+  </div>
+
+  <ul class="sidebar-listNav">
+    <li><a id="extras-list" href="#full-list">Pages</a></li>
+
+    
+
+    
+
+    
+  </ul>
+
+  <ul id="full-list" class="sidebar-fullList"></ul>
+  <div class="sidebar-noResults"></div>
+</section>
+
+<section class="content">
+  <div class="content-outer">
+    <div id="content" class="content-inner">
+
+
+<h1>README</h1>
+<p>Adding a Map API to a GenServer or Module with Agent-held State.</p>
+<p>Amlapio is a module that can be <em>use</em>-ed to generate “wrapper” functions to call
+Map functions on the state of a GenServer, or a module using
+an Agent to hold its state.</p>
+<p>Wrappers can be generated for the state itself or submaps of the state
+(e.g. <em>buttons</em> in the examples below).</p>
+<p>Wrappers for just a subset of Map functions can be specified using <strong>funs</strong>.</p>
+<p>The wrapper functions can be named explicitly by supplying a <strong>namer</strong> function.</p>
+<p>See my
+<a href="http://ianrumford.github.io/blog/2016/09/13/amlapio.html">blog post</a> for
+some background.</p>
+<h2 id="installation" class="section-heading">
+  <a href="#installation" class="hover-link"><i class="icon-link"></i></a>
+   Installation
+</h2><p>Add <strong>amlapio</strong> to your list of dependencies in <span class="underline">mix.exs</span>:</p>
+<pre><code class="elixir">def deps do
+  [{:amlapio, &quot;~&gt; 0.1.0&quot;}]
+end</code></pre>
+<h2 id="agent-usage" class="section-heading">
+  <a href="#agent-usage" class="hover-link"><i class="icon-link"></i></a>
+   Agent Usage
+</h2><p>The example below generates wrappers for the <em>buttons</em>, <em>menus</em> and
+  <em>checkboxes</em> submaps of a Module using an Agent to hold its state. The
+  names of the submap wrappers, by default, are of the form <em>submap_function</em> e.g.
+  <em>buttons_pop</em></p>
+<p>It also generates three wrappers for the state itself by setting the
+  submap names to nil (<em>agent: nil</em>). Also a
+  <strong>namer</strong> (function) is given to name the state wrappers <em>agent_state_get</em> ,
+  <em>agent_state_put</em>, and <em>agent_state_pop</em>.</p>
+<pre><code class="elixir">defmodule ExampleAgent1 do
+
+  # generate wrappers for three submaps
+  use Amlapio, agent: [:buttons, :menus, :checkboxes]
+
+  # generate *only* get, put and pop wrappers for the state itself and
+  # use a namer function to name the wrappers &quot;agent_state_get&quot;,
+  # &quot;agent_state_put&quot; and &quot;agent_state_pop&quot;
+  use Amlapio, agent: nil, funs: [:get, :put, :pop],
+    namer: fn _map_name, fun_name -&gt;
+    [&quot;agent_state_&quot;, to_string(fun_name)] |&gt; Enum.join |&gt; String.to_atom
+  end
+
+  # create the agent; note the default state is an empty map
+  def start_link(state \\ %{}) do
+    Agent.start_link(fn -&gt; state end)
+  end
+
+end</code></pre>
+<p>The state wrappers would be used as you’d expect and as shown in the test below:</p>
+<pre><code class="elixir">test &quot;agent_state1&quot; do
+
+  buttons_state = %{1 =&gt; :button_back, 2 =&gt; :button_next, 3 =&gt; :button_exit}
+  menus_state = %{menu_a: 1, menu_b: :two, menu_c: &quot;tre&quot;}
+  checkboxes_state = %{checkbox_yesno: [:yes, :no], checkbox_bool: [true, false]}
+  agent_state = %{buttons: buttons_state, menus: menus_state, checkboxes: checkboxes_state}
+
+  # create the agent
+  {:ok, agent} = ExampleAgent1.start_link(agent_state)
+
+  # some usage examples
+
+  assert buttons_state == agent |&gt; ExampleAgent1.agent_state_get(:buttons)
+
+  assert agent == agent |&gt; ExampleAgent1.agent_state_put(:menus, 42)
+  assert 42 == agent |&gt; Agent.get(fn s -&gt; s end) |&gt; Map.get(:menus)
+
+  assert {checkboxes_state, agent} == agent |&gt; ExampleAgent1.agent_state_pop(:checkboxes)
+  assert %{buttons: buttons_state, menus: 42} == agent |&gt; Agent.get(fn s -&gt; s end)
+
+  assert 99 == agent |&gt; ExampleAgent1.agent_state_get(:some_other_key, 99)
+
+end</code></pre>
+<p>Similarly the submap wrappers as demonstrated in the test below:</p>
+<pre><code class="elixir">test &quot;agent_submap1&quot; do
+
+  buttons_state = %{1 =&gt; :button_back, 2 =&gt; :button_next, 3 =&gt; :button_exit}
+  menus_state = %{menu_a: 1, menu_b: :two, menu_c: &quot;tre&quot;}
+  checkboxes_state = %{checkbox_yesno: [:yes, :no], checkbox_bool: [true, false]}
+  agent_state = %{buttons: buttons_state, 
+                  menus: menus_state, checkboxes: checkboxes_state}
+
+  # create the agent
+  {:ok, agent} = ExampleAgent1.start_link(agent_state)
+
+  # some usage examples
+
+  assert :button_back == agent |&gt; ExampleAgent1.buttons_get(1)
+  assert :button_default == 
+    agent |&gt; ExampleAgent1.buttons_get(99, :button_default)
+
+  assert agent == agent |&gt; ExampleAgent1.menus_put(:menu_d, 42)
+  assert menus_state |&gt; Map.put(:menu_d, 42) == agent |&gt; ExampleAgent1.agent_state_get(:menus)
+
+  assert {[:yes, :no], agent} == 
+    agent |&gt; ExampleAgent1.checkboxes_pop(:checkbox_yesno)
+
+end</code></pre>
+<h2 id="genserver-usage" class="section-heading">
+  <a href="#genserver-usage" class="hover-link"><i class="icon-link"></i></a>
+   GenServer Usage
+</h2><p>Creating wrappers for a GenServer’s state is very similar. However,
+each wrapper has two “parts”: an <em>api</em> function and a <em>handle_call</em> function.</p>
+<p>The <em>api</em> wrapper for e.g. `buttons_get/3` looks like:</p>
+<pre><code class="elixir"># api wrapper for buttons_get
+def buttons_get(pid, button_name, button_default \\ nil) do
+ GenServer.call(pid, {:buttons_get, button_name, button_default})
+end</code></pre>
+<p>… while the matching <em>handle_call</em> looks like:</p>
+<pre><code class="elixir">def handle_call({:buttons_get, button_name, button_default}, _fromref, state) do
+  value = state |&gt; Map.get(:buttons, %{}) |&gt; Map.get(button_name, button_default)
+  {:reply, value, state}
+end</code></pre>
+<p>To prevent compiler warnings all of the <em>handle_call</em> functions for
+  a GenServer must be grouped together in the source. So there are
+  two <em>uses</em> to define the wrappers: one for the <em>apis</em> and one for the <em>handle_calls</em></p>
+<p>As for an agent, the example below generates wrappers for the <em>buttons</em>, <em>menus</em> and
+  <em>checkboxes</em> submaps of the GenServer’s state. </p>
+<p>In a minor difference to the agent example, the example generate four
+ wrappers for the state itself and uses a
+  <strong>namer</strong> (function) to name them <em>state_get</em>, <em>state_put</em>, <em>state_pop</em> and <em>state_take</em>.</p>
+<pre><code class="elixir">defmodule ExampleGenServer1 do
+
+  # its a genserver
+  use GenServer
+
+  # generate API wrappers for three submaps
+  use Amlapio, genserver_api: [:buttons, :menus, :checkboxes]
+
+  # generate *only* get, put, pop and take wrappers for the state itself and
+  # use a namer function to name the wrappers &quot;state_get&quot;,
+  # &quot;state_put&quot;, &quot;state_pop&quot;, and &quot;state_take&quot;
+  use Amlapio, genserver_api: nil, funs: [:get, :put, :pop, :take],
+    namer: fn _map_name, fun_name -&gt;
+    [&quot;state_&quot;, to_string(fun_name)] |&gt; Enum.join |&gt; String.to_atom
+  end
+
+  # create the genserver; note the default state is an empty map
+  def start_link(state \\ %{}) do
+    GenServer.start_link(__MODULE__, state)
+  end
+
+  # &lt;&lt; more functions&gt;&gt;
+
+  # handle_calls start here
+
+  # generate the handle_call functions for three submaps&#39; wrappers
+  use Amlapio, genserver_handle_call: [:buttons, :menus, :checkboxes]
+
+  # generate the handle_call functions for the state wrappers.
+  use Amlapio, genserver_handle_call: nil, funs: [:get, :put, :pop, :take],
+    namer: fn _map_name, fun_name -&gt;
+    [&quot;state_&quot;, to_string(fun_name)] |&gt; Enum.join |&gt; String.to_atom
+  end
+
+end</code></pre>
+<p>Some examples of the state wrappers:</p>
+<pre><code class="elixir">test &quot;genserver_state1&quot; do
+
+  buttons_state = %{1 =&gt; :button_back, 2 =&gt; :button_next, 3 =&gt; :button_exit}
+  menus_state = %{menu_a: 1, menu_b: :two, menu_c: &quot;tre&quot;}
+  checkboxes_state = %{checkbox_yesno: [:yes, :no], checkbox_bool: [true, false]}
+  genserver_state = %{buttons: buttons_state, menus: menus_state, checkboxes: checkboxes_state}
+
+  # create the genserver
+  {:ok, genserver} = ExampleGenServer1.start_link(genserver_state)
+
+  # some examples
+
+  assert buttons_state == genserver |&gt; ExampleGenServer1.state_get(:buttons)
+
+  assert genserver == genserver |&gt; ExampleGenServer1.state_put(:menus, 42)
+  assert 42 == genserver |&gt; ExampleGenServer1.state_get(:menus)
+
+  assert {checkboxes_state, genserver} == genserver |&gt; ExampleGenServer1.state_pop(:checkboxes)
+  assert %{buttons: buttons_state, menus: 42} == 
+    genserver |&gt; ExampleGenServer1.state_take([:buttons, :menus, :checkboxes])
+
+  assert 99 == genserver |&gt; ExampleGenServer1.state_get(:some_other_key, 99)
+
+end</code></pre>
+<p>The submap wrappers are used in an identical way to the agent example as demonstrated
+in the test below. Note these tests use the state functions.</p>
+<pre><code class="elixir">test &quot;genserver_submap1&quot; do
+
+  buttons_state = %{1 =&gt; :button_back, 2 =&gt; :button_next, 3 =&gt; :button_exit}
+  menus_state = %{menu_a: 1, menu_b: :two, menu_c: &quot;tre&quot;}
+  checkboxes_state = %{checkbox_yesno: [:yes, :no], checkbox_bool: [true, false]}
+  genserver_state = %{buttons: buttons_state, menus: menus_state, checkboxes: checkboxes_state}
+
+  # create the genserver
+  {:ok, genserver} = ExampleGenServer1.start_link(genserver_state)
+
+  # some examples
+
+  assert :button_back == genserver |&gt; ExampleGenServer1.buttons_get(1)
+  assert :button_default == genserver |&gt; ExampleGenServer1.buttons_get(99, :button_default)
+
+  assert genserver == genserver |&gt; ExampleGenServer1.menus_put(:menu_d, 42)
+  assert 42 == genserver |&gt; ExampleGenServer1.state_get(:menus) |&gt; Map.get(:menu_d)
+
+  assert {[:yes, :no], genserver} == genserver |&gt; ExampleGenServer1.checkboxes_pop(:checkbox_yesno)
+  assert %{checkbox_bool: [true, false]} == genserver |&gt; ExampleGenServer1.state_get(:checkboxes)
+
+end</code></pre>
+
+      <footer class="footer">
+        <p>
+          <span class="line">
+            Built using
+            <a href="https://github.com/elixir-lang/ex_doc" title="ExDoc" rel="help" target="_blank">ExDoc</a> (v0.13.0),
+          </span>
+          <span class="line">
+            designed by
+            <a href="https://twitter.com/dignifiedquire" target="_blank" title="@dignifiedquire">Friedel Ziegelmayer</a>.
+            </span>
+        </p>
+        <button class="night-mode-toggle" />
+      </footer>
+    </div>
+  </div>
+</section>
+</div>
+  <script src="dist/app-21f1a20b9e.js"></script>
+  </body>
+</html>
+
