@@ -18,19 +18,19 @@ defmodule Amlapio.Utils do
     [to_string(map_name), "_", to_string(fun_name)] |> Enum.join |> String.to_atom
   end
 
-  @map_functions_vars_map [:pid, :arg1, :arg2, :arg3, :state, :_from]
+  @amlapio_functions_vars_map [:pid, :arg1, :arg2, :arg3, :state, :_from]
   |> Enum.map(fn name -> {name, name |> Macro.var(nil)} end)
   |> Enum.into(%{})
 
-  @map_functions_signature_vars_list [:pid, :arg1, :arg2, :arg3]
-  |> Enum.map(fn name -> @map_functions_vars_map |> Map.fetch!(name) end)
+  @amlapio_functions_signature_vars_list [:pid, :arg1, :arg2, :arg3]
+  |> Enum.map(fn name -> @amlapio_functions_vars_map |> Map.fetch!(name) end)
 
   def map_wrap_fun_signature_build(%{fun_name: fun_name,
                                      fun_arity: fun_arity,
-                                     signature_type: :genserver_call,
-                                     map_type: :genserver_api}) do
+                                     signature_type: :behaviour_call,
+                                     map_type: :behaviour_api}) do
 
-    fun_tuple_args = [fun_name] ++ Enum.slice(@map_functions_signature_vars_list, 1 .. (fun_arity - 1))
+    fun_tuple_args = [fun_name] ++ Enum.slice(@amlapio_functions_signature_vars_list, 1 .. (fun_arity - 1))
 
     [{:{}, [], fun_tuple_args}]
 
@@ -39,23 +39,23 @@ defmodule Amlapio.Utils do
   def map_wrap_fun_signature_build(%{fun_name: fun_name,
                                      fun_arity: fun_arity,
                                      signature_type: :def,
-                                     map_type: :genserver_handle_call}) do
+                                     map_type: :behaviour_callback}) do
 
-    fun_tuple_args = [fun_name] ++ Enum.slice(@map_functions_signature_vars_list, 1 .. (fun_arity - 1))
+    fun_tuple_args = [fun_name] ++ Enum.slice(@amlapio_functions_signature_vars_list, 1 .. (fun_arity - 1))
 
     fun_tuple = {:{}, [], fun_tuple_args}
 
     [fun_tuple |
 
       [:_from, :state]
-      |> Enum.map(fn name -> @map_functions_vars_map |> Map.fetch!(name) end)
+      |> Enum.map(fn name -> @amlapio_functions_vars_map |> Map.fetch!(name) end)
     ]
 
   end
 
   # default
   def map_wrap_fun_signature_build(%{fun_arity: fun_arity}) do
-    @map_functions_signature_vars_list |> Enum.slice(1 .. (fun_arity - 1))
+    @amlapio_functions_signature_vars_list |> Enum.slice(1 .. (fun_arity - 1))
   end
 
   def map_wrap_vars_fetch!(names) when is_list(names) do
@@ -68,14 +68,14 @@ defmodule Amlapio.Utils do
 
       Range.range?(range) ->
 
-        @map_functions_signature_vars_list |> Enum.slice(range)
+        @amlapio_functions_signature_vars_list |> Enum.slice(range)
 
     end
 
   end
 
   def map_wrap_var_fetch!(name) when is_atom(name) do
-    @map_functions_vars_map |> Map.fetch!(name)
+    @amlapio_functions_vars_map |> Map.fetch!(name)
   end
 
   def map_wrap_fun_ast_get(map_wrap) do
@@ -157,7 +157,6 @@ defmodule Amlapio.Utils do
 
       List.wrap(push_asts) ++ List.wrap(fun_ast)
 
-      #_ -> nil
     end)
     # flatten and add the "top level" fun ast
     |> List.flatten([map_wrap |> map_wrap_fun_ast_get])

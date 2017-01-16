@@ -2,7 +2,7 @@
 
 Adding a Map API to a GenServer or Module with Agent-held State.
 
-Amlapio is a module that can be *use*-ed to generate "wrapper" functions to call
+Amlapio can be *use*-d to generate "wrapper" functions that call
 Map functions on the state of a GenServer, or a module using
 an Agent to hold its state.
 
@@ -14,7 +14,7 @@ Wrappers for just a subset of Map functions can be specified using **funs**.
 The wrapper functions can be named explicitly by supplying a **namer** function.
 
 See my
-[blog post](<http://ianrumford.github.io/blog/2016/09/13/amlapio.html>) for
+[blog post](<http://ianrumford.github.io/elixir/map/api/genserver/module/agent/state/2016/09/13/amlapio.html>) for
 some background.
 
 ## Installation
@@ -22,7 +22,7 @@ some background.
 Add **amlapio** to your list of dependencies in <span class="underline">mix.exs</span>:
 
     def deps do
-      [{:amlapio, "~> 0.1.0"}]
+      [{:amlapio, "~> 0.2.0"}]
     end
 
 ## Agent Usage
@@ -34,7 +34,7 @@ The example below generates wrappers for the *buttons*, *menus* and
 
 It also generates three wrappers for the state itself by setting the
   submap names to nil (*agent: nil*). Also a
-  **namer** (function) is given to name the state wrappers *agent\_state\_get* ,
+  **namer** (function) is given to name the state  wrappers *agent\_state\_get* ,
   *agent\_state\_put*, and *agent\_state\_pop*.
 
     defmodule ExampleAgent1 do

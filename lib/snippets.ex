@@ -7,25 +7,24 @@ defmodule Amlapio.Snippets do
 
   def map_wrap_make_snippet(snippet, map_wrap)
 
-  def map_wrap_make_snippet(:trace_state, _map_wrap) do
-    quote do
-    end
-  end
+  def map_wrap_make_snippet(:behaviour_call, map_wrap) do
 
-  def map_wrap_make_snippet(:genserver_call, map_wrap) do
+    behaviour_module = map_wrap |> Map.get(:behaviour_module, GenServer)
+    behaviour_function = map_wrap |> Map.get(:behaviour_function, :call)
 
     fun_signature = map_wrap
-    |> Map.put(:signature_type, :genserver_call)
+    |> Map.put(:signature_type, :behaviour_call)
     |> AMLUtils.map_wrap_fun_signature_build
 
     quote do
-      pid |> GenServer.call(unquote_splicing(fun_signature))
+      #pid |> GenServer.call(unquote_splicing(fun_signature))
+      pid |> unquote(behaviour_module).unquote(behaviour_function)(unquote_splicing(fun_signature))
     end
 
   end
 
-  def map_wrap_make_snippet(:fun_def, %{map_type: :genserver_handle_call,
-                                                 fun_ast: fun_ast} = map_wrap) do
+  def map_wrap_make_snippet(:fun_def, %{map_type: :behaviour_callback,
+                                        fun_ast: fun_ast} = map_wrap) do
 
     fun_signature = map_wrap
     |> Map.put(:signature_type, :def)
@@ -39,7 +38,7 @@ defmodule Amlapio.Snippets do
   end
 
   def map_wrap_make_snippet(:fun_def, %{fun_name: fun_name,
-                                                 fun_ast: fun_ast} = map_wrap) do
+                                        fun_ast: fun_ast} = map_wrap) do
 
     fun_signature = map_wrap |> AMLUtils.map_wrap_fun_signature_build
 
@@ -56,7 +55,7 @@ defmodule Amlapio.Snippets do
     end
   end
 
-  def map_wrap_make_snippet(:state_get, %{map_type: :genserver_handle_call}) do
+  def map_wrap_make_snippet(:state_get, %{map_type: :behaviour_callback}) do
     quote do
       # start with the agent (pid) and get its state
       unquote(AMLUtils.map_wrap_var_fetch!(:state))
@@ -77,7 +76,7 @@ defmodule Amlapio.Snippets do
     end
   end
 
-  def map_wrap_make_snippet(:state_put, %{map_type: :genserver_handle_call}) do
+  def map_wrap_make_snippet(:state_put, %{map_type: :behaviour_callback}) do
     nil
   end
 
@@ -137,7 +136,6 @@ defmodule Amlapio.Snippets do
 
   def map_wrap_make_snippet(:assign_value, %{fun_ast: fun_ast}) do
     quote do
-      ##state = unquote(fun_ast)
       value = unquote(fun_ast)
     end
   end
@@ -167,7 +165,7 @@ defmodule Amlapio.Snippets do
   end
 
   def map_wrap_make_snippet(:result_value, %{map_type: :agent,
-                                                      fun_type: :popper}) do
+                                             fun_type: :popper}) do
     quote do
       # return the value and pid tuple
       {value, pid}
@@ -181,38 +179,37 @@ defmodule Amlapio.Snippets do
     end
   end
 
-  def map_wrap_make_snippet(:result_value, %{map_type: :genserver_handle_call,
-                                                      fun_type: :popper}) do
+  def map_wrap_make_snippet(:result_value, %{map_type: :behaviour_callback,
+                                             fun_type: :popper}) do
     quote do
-      {:reply, {value, self}, unquote(AMLUtils.map_wrap_var_fetch!(:state))}
+      {:reply, {value, self()}, unquote(AMLUtils.map_wrap_var_fetch!(:state))}
     end
   end
 
-  def map_wrap_make_snippet(:result_value, %{map_type: :genserver_handle_call,
+  def map_wrap_make_snippet(:result_value, %{map_type: :behaviour_callback,
                                                       fun_type: :accessor}) do
     quote do
       {:reply, value, unquote(AMLUtils.map_wrap_var_fetch!(:state))}
     end
   end
 
-  def map_wrap_make_snippet(:result_value, %{map_type: :genserver_handle_call,
-                                                      fun_type: :mutator}) do
+  def map_wrap_make_snippet(:result_value, %{map_type: :behaviour_callback,
+                                             fun_type: :mutator}) do
     quote do
-      {:reply, self, unquote(AMLUtils.map_wrap_var_fetch!(:state))}
+      {:reply, self(), unquote(AMLUtils.map_wrap_var_fetch!(:state))}
     end
   end
 
-  def map_wrap_make_snippet(:make_body, %{map_type: :genserver_api} = map_wrap) do
+  def map_wrap_make_snippet(:make_body, %{map_type: :behaviour_api} = map_wrap) do
 
-    [push: [make: :genserver_call],]
+    [push: [make: :behaviour_call]]
     |> AMLDSL.map_wrap_dsl(map_wrap)
 
   end
 
-  def map_wrap_make_snippet(:make_fun, %{map_type: :genserver_api} = map_wrap) do
+  def map_wrap_make_snippet(:make_fun, %{map_type: :behaviour_api} = map_wrap) do
 
     [push: [make: :make_body],
-
      make: {&AMLUtils.map_wrap_push_wraps_asts_reduce_recursive/1, :fun_def}
     ]
     |> AMLDSL.map_wrap_dsl(map_wrap)
@@ -234,7 +231,7 @@ defmodule Amlapio.Snippets do
   end
 
   def map_wrap_make_snippet(:make_fun, %{fun_type: :accessor,
-                                                 map_type: :genserver_handle_call} = map_wrap) do
+                                         map_type: :behaviour_callback} = map_wrap) do
 
     [push: [make: :make_body, make: :assign_value],
 
@@ -253,10 +250,10 @@ defmodule Amlapio.Snippets do
 
   end
 
- def map_wrap_make_snippet(:make_body, %{fun_type: :mutator, map_name: nil} = map_wrap) do
+  def map_wrap_make_snippet(:make_body, %{fun_type: :mutator, map_name: nil} = map_wrap) do
 
-   [push: [pipe: [pipe: [make: :state, make: :fun_apply]], make: :assign_state]]
-   |> AMLDSL.map_wrap_dsl(map_wrap)
+    [push: [pipe: [pipe: [make: :state, make: :fun_apply]], make: :assign_state]]
+    |> AMLDSL.map_wrap_dsl(map_wrap)
 
   end
 
@@ -279,15 +276,15 @@ defmodule Amlapio.Snippets do
   end
 
   def map_wrap_make_snippet(:make_fun, %{fun_type: :mutator,
-                                                  map_type: :genserver_handle_call} = map_wrap) do
+                                         map_type: :behaviour_callback} = map_wrap) do
 
     [push: [make: :make_body],
 
-     push: [make: :result_value],
+    push: [make: :result_value],
 
-     make: {&AMLUtils.map_wrap_push_wraps_asts_reduce_recursive/1, :fun_def}
-    ]
-    |> AMLDSL.map_wrap_dsl(map_wrap)
+    make: {&AMLUtils.map_wrap_push_wraps_asts_reduce_recursive/1, :fun_def}
+   ]
+   |> AMLDSL.map_wrap_dsl(map_wrap)
 
   end
 
@@ -295,11 +292,11 @@ defmodule Amlapio.Snippets do
 
     [push: [make: :state_get, make: :assign_state],
 
-      push: [make: :make_body],
+     push: [make: :make_body],
 
-      push: [make: :state_put],
+     push: [make: :state_put],
 
-      push: [make: :result_value],
+     push: [make: :result_value],
 
      make: {&AMLUtils.map_wrap_push_wraps_asts_reduce_recursive/1, :fun_def}
     ]
@@ -326,7 +323,7 @@ defmodule Amlapio.Snippets do
   end
 
   def map_wrap_make_snippet(:make_fun, %{fun_type: :popper,
-                                                  map_type: :genserver_handle_call} = map_wrap) do
+                                         map_type: :behaviour_callback} = map_wrap) do
 
     [push: [make: :make_body],
 
